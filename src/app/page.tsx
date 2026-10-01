@@ -7,6 +7,7 @@ import PptxGenJS from 'pptxgenjs';
 import { jsPDF } from 'jspdf';
 import * as tamilTools from 'tamil-language-tools-and-assets';
 import { unicodeToDlManel } from 'sinhala-unicode-coverter';
+import Keyboard from '../components/Keyboard';
 
 export default function OmniScribeApp() {
   const [activeTab, setActiveTab] = useState<'transcribe' | 'convert'>('transcribe');
@@ -149,6 +150,7 @@ function TranscriberView({
   
   const recognitionRef = useRef<any>(null);
   const textRef = useRef(text);
+  const textAreaRef = useRef<HTMLTextAreaElement>(null);
   
   useEffect(() => {
     textRef.current = text;
@@ -201,6 +203,45 @@ function TranscriberView({
       updateText(current + (current.endsWith(' ') || current.length === 0 ? '' : ' '));
       recognitionRef.current?.start();
       setIsRecording(true);
+    }
+  };
+
+  const insertText = (str: string) => {
+    const el = textAreaRef.current;
+    if (el) {
+      const start = el.selectionStart;
+      const end = el.selectionEnd;
+      const newText = textRef.current.substring(0, start) + str + textRef.current.substring(end);
+      updateText(newText);
+      setTimeout(() => {
+        el.selectionStart = el.selectionEnd = start + str.length;
+        el.focus();
+      }, 0);
+    } else {
+      updateText(textRef.current + str);
+    }
+  };
+
+  const handleBackspace = () => {
+    const el = textAreaRef.current;
+    if (el) {
+      const start = el.selectionStart;
+      const end = el.selectionEnd;
+      if (start === end && start > 0) {
+        const newText = textRef.current.substring(0, start - 1) + textRef.current.substring(end);
+        updateText(newText);
+        setTimeout(() => {
+          el.selectionStart = el.selectionEnd = start - 1;
+          el.focus();
+        }, 0);
+      } else if (start !== end) {
+        const newText = textRef.current.substring(0, start) + textRef.current.substring(end);
+        updateText(newText);
+        setTimeout(() => {
+          el.selectionStart = el.selectionEnd = start;
+          el.focus();
+        }, 0);
+      }
     }
   };
 
@@ -374,6 +415,7 @@ function TranscriberView({
           
           <div className="flex-1 overflow-hidden relative rounded-lg border border-white/5 bg-black/30 p-4">
             <textarea
+              ref={textAreaRef}
               value={text}
               onChange={(e) => updateText(e.target.value)}
               placeholder="Your transcript will appear here. You can also type directly..."
@@ -386,6 +428,14 @@ function TranscriberView({
             )}
           </div>
         </div>
+        
+        {/* On-Screen Keyboard */}
+        <Keyboard 
+          onKeyPress={(key) => insertText(key)}
+          onBackspace={handleBackspace}
+          onSpace={() => insertText(' ')}
+          onEnter={() => insertText('\n')}
+        />
       </div>
     </div>
   );
