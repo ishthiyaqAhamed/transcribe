@@ -342,7 +342,7 @@ function TranscriberView({
 
       {/* Main Console */}
       <div className="lg:col-span-3 space-y-4">
-        <div className="bg-[#18181b] border border-white/10 rounded-xl p-5 shadow-xl shadow-black/50 flex flex-col h-[600px]">
+        <div className="bg-[#18181b] border border-white/10 rounded-xl p-5 shadow-xl shadow-black/50 flex flex-col">
           <div className="flex items-center justify-between mb-4 border-b border-white/10 pb-4">
             <button
               onClick={toggleRecording}
@@ -413,13 +413,13 @@ function TranscriberView({
             </div>
           </div>
           
-          <div className="flex-1 overflow-hidden relative rounded-lg border border-white/5 bg-black/30 p-4">
+          <div className="relative rounded-lg border border-white/5 bg-black/30 p-4">
             <textarea
               ref={textAreaRef}
               value={text}
               onChange={(e) => updateText(e.target.value)}
               placeholder="Your transcript will appear here. You can also type directly..."
-              className="w-full h-full bg-transparent text-white/90 text-lg resize-none outline-none placeholder:text-white/20 font-light leading-relaxed"
+              className="w-full min-h-[300px] bg-transparent text-white/90 text-lg resize-y outline-none placeholder:text-white/20 font-light leading-relaxed"
             />
             {interimText && (
               <div className="absolute bottom-4 left-4 right-4 p-3 bg-indigo-500/10 border border-indigo-500/20 rounded-lg text-indigo-300 italic text-sm backdrop-blur-md">
