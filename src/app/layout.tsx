@@ -17,6 +17,9 @@ export const metadata: Metadata = {
   description: "Live multilingual transcription and font/encoding converter for Tamil, Sinhala, English, Arabic, Hindi, and Urdu.",
 };
 
+export const dynamic = 'force-dynamic';
+export const revalidate = 0;
+
 export default function RootLayout({ children }: LayoutProps<"/">) {
   return (
     <html
