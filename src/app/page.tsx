@@ -352,6 +352,7 @@ function TranscriberView({
   const [isRecording, setIsRecording] = useState(false);
   const [language, setLanguage] = useState('en-US');
   
+  const isRecordingRef = useRef(false);
   const recognitionRef = useRef<any>(null);
   const textRef = useRef(text);
   const textAreaRef = useRef<HTMLTextAreaElement>(null);
@@ -360,28 +361,45 @@ function TranscriberView({
     textRef.current = text;
   }, [text]);
 
-  const initRecognition = useCallback(() => {
-    if (typeof window === 'undefined') return null;
+  const stopRecordingSession = useCallback(() => {
+    isRecordingRef.current = false;
+    setIsRecording(false);
+    setInterimText('');
+    if (recognitionRef.current) {
+      try {
+        recognitionRef.current.onend = null;
+        recognitionRef.current.onerror = null;
+        recognitionRef.current.stop();
+      } catch (_) {}
+    }
+  }, []);
+
+  const startRecordingSession = useCallback((langToUse?: string) => {
+    if (typeof window === 'undefined') return;
     const SpeechRecognition = (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition;
-    if (!SpeechRecognition) return null;
+    if (!SpeechRecognition) {
+      showToast("Speech Recognition is not supported in this browser. Please open in Google Chrome or Microsoft Edge.", "error");
+      return;
+    }
+
+    // Stop and clean any active recognition
+    if (recognitionRef.current) {
+      try {
+        recognitionRef.current.onend = null;
+        recognitionRef.current.onerror = null;
+        recognitionRef.current.abort();
+      } catch (_) {}
+    }
 
     try {
-      if (recognitionRef.current) {
-        try {
-          recognitionRef.current.abort();
-        } catch (_) {}
-      }
-
       const rec = new SpeechRecognition();
-      try {
-        rec.continuous = true;
-      } catch (_) {}
-      try {
-        rec.interimResults = true;
-      } catch (_) {}
-      rec.lang = language;
+      try { rec.continuous = true; } catch (_) {}
+      try { rec.interimResults = true; } catch (_) {}
+      const targetLang = langToUse || language;
+      rec.lang = targetLang;
 
       rec.onstart = () => {
+        isRecordingRef.current = true;
         setIsRecording(true);
       };
 
@@ -406,9 +424,16 @@ function TranscriberView({
       };
 
       rec.onerror = (e: any) => {
-        console.error("Speech recognition error:", e.error, e);
+        // 'aborted' is fired when stopping or restarting recognition - ignore it completely
+        if (e.error === 'aborted') {
+          return;
+        }
+
+        console.warn("Speech recognition notice:", e.error);
+        isRecordingRef.current = false;
         setIsRecording(false);
         setInterimText('');
+
         if (e.error === 'not-allowed') {
           showToast("Microphone access blocked! Click the lock/microphone icon in your browser address bar to allow access.", "error");
         } else if (e.error === 'audio-capture') {
@@ -417,79 +442,29 @@ function TranscriberView({
           showToast("Network error. Speech recognition requires an active internet connection.", "error");
         } else if (e.error === 'no-speech') {
           showToast("No speech detected. Please speak closer to your microphone.", "warning");
-        } else if (e.error !== 'aborted') {
-          showToast(`Speech recognition error: ${e.error}`, "error");
+        } else {
+          showToast(`Speech recognition notice: ${e.error}`, "info");
         }
       };
 
       rec.onend = () => {
+        // If still flagged as active recording (e.g. browser speech silence auto-restart)
+        if (isRecordingRef.current) {
+          try {
+            rec.start();
+            return;
+          } catch (_) {}
+        }
+        isRecordingRef.current = false;
         setIsRecording(false);
         setInterimText('');
       };
 
       recognitionRef.current = rec;
-      return rec;
-    } catch (err) {
-      console.error("Failed to initialize SpeechRecognition:", err);
-      return null;
-    }
-  }, [language, updateText, showToast]);
-
-  useEffect(() => {
-    return () => {
-      try {
-        recognitionRef.current?.abort();
-      } catch (_) {}
-    };
-  }, []);
-
-  useEffect(() => {
-    if (recognitionRef.current) {
-      recognitionRef.current.lang = language;
-    }
-    if (isRecording) {
-      try {
-        recognitionRef.current?.stop();
-      } catch (_) {}
-      setTimeout(() => {
-        try {
-          const rec = initRecognition();
-          rec?.start();
-          setIsRecording(true);
-        } catch (_) {}
-      }, 200);
-    }
-  }, [language, initRecognition, isRecording]);
-
-  const toggleRecording = () => {
-    if (isRecording) {
-      try {
-        recognitionRef.current?.stop();
-      } catch (e) {
-        console.error("Error stopping recognition:", e);
-      }
-      setIsRecording(false);
-      setInterimText('');
-      showToast("Recording stopped.", "info");
-      return;
-    }
-
-    const SpeechRecognition = typeof window !== 'undefined' && ((window as any).SpeechRecognition || (window as any).webkitSpeechRecognition);
-    if (!SpeechRecognition) {
-      showToast("Speech Recognition is not supported in this browser. Please open OmniScribe in Google Chrome or Microsoft Edge.", "error");
-      return;
-    }
-
-    const rec = initRecognition();
-    if (!rec) {
-      showToast("Could not start speech recognition.", "error");
-      return;
-    }
-
-    try {
-      rec.lang = language;
       rec.start();
+      isRecordingRef.current = true;
       setIsRecording(true);
+
       const langNames: Record<string, string> = {
         'en-US': 'English',
         'ta-LK': 'Tamil (தமிழ்)',
@@ -498,17 +473,47 @@ function TranscriberView({
         'hi-IN': 'Hindi (हिन्दी)',
         'ur-PK': 'Urdu (اردو)',
       };
-      showToast(`Recording active. Listening in ${langNames[language] || language}...`, "success");
-    } catch (startErr: any) {
-      console.error("Speech start error:", startErr);
-      if (startErr.name === 'InvalidStateError') {
-        setIsRecording(true);
-      } else {
-        showToast("Error starting speech recognition: " + (startErr.message || "Please refresh the page"), "error");
-        setIsRecording(false);
+      showToast(`Recording active. Listening in ${langNames[targetLang] || targetLang}...`, "success");
+    } catch (err: any) {
+      console.error("Failed to start speech recognition:", err);
+      isRecordingRef.current = false;
+      setIsRecording(false);
+      if (err?.name !== 'InvalidStateError') {
+        showToast("Error starting speech recognition: " + (err?.message || "Please refresh the page"), "error");
       }
     }
+  }, [language, updateText, showToast]);
+
+  const toggleRecording = () => {
+    if (isRecordingRef.current) {
+      stopRecordingSession();
+      showToast("Recording stopped.", "info");
+    } else {
+      startRecordingSession();
+    }
   };
+
+  const handleLanguageChange = (newLang: string) => {
+    setLanguage(newLang);
+    if (isRecordingRef.current) {
+      stopRecordingSession();
+      setTimeout(() => {
+        startRecordingSession(newLang);
+      }, 250);
+    }
+  };
+
+  useEffect(() => {
+    return () => {
+      try {
+        if (recognitionRef.current) {
+          recognitionRef.current.onend = null;
+          recognitionRef.current.onerror = null;
+          recognitionRef.current.abort();
+        }
+      } catch (_) {}
+    };
+  }, []);
 
   const insertText = (str: string) => {
     const el = textAreaRef.current;
@@ -655,7 +660,7 @@ function TranscriberView({
                 ].map(lang => (
                   <button
                     key={lang.id}
-                    onClick={() => setLanguage(lang.id)}
+                    onClick={() => handleLanguageChange(lang.id)}
                     className={`text-left px-3 py-2 rounded-lg text-sm transition-all border ${
                       language === lang.id 
                         ? 'bg-indigo-500/10 border-indigo-500/50 text-indigo-300' 
