@@ -36,8 +36,47 @@ interface ConfirmDialogState {
   onConfirm: () => void;
 }
 
-export default function OmniScribeApp() {
-  const [activeTab, setActiveTab] = useState<'transcribe' | 'convert'>('transcribe');
+export default function OmniScribeApp({ initialTab = 'transcribe' }: { initialTab?: 'transcribe' | 'convert' }) {
+  const [activeTab, setActiveTab] = useState<'transcribe' | 'convert'>(initialTab);
+
+  useEffect(() => {
+    if (typeof window !== 'undefined') {
+      const path = window.location.pathname;
+      const hash = window.location.hash;
+      if (path === '/convert' || hash === '#convert') {
+        setActiveTab('convert');
+      } else if (path === '/' && hash !== '#convert') {
+        if (initialTab !== 'convert') {
+          setActiveTab('transcribe');
+        }
+      }
+
+      const handleNavigation = () => {
+        const curPath = window.location.pathname;
+        const curHash = window.location.hash;
+        if (curPath === '/convert' || curHash === '#convert') {
+          setActiveTab('convert');
+        } else {
+          setActiveTab('transcribe');
+        }
+      };
+
+      window.addEventListener('popstate', handleNavigation);
+      window.addEventListener('hashchange', handleNavigation);
+      return () => {
+        window.removeEventListener('popstate', handleNavigation);
+        window.removeEventListener('hashchange', handleNavigation);
+      };
+    }
+  }, [initialTab]);
+
+  const switchTab = useCallback((tab: 'transcribe' | 'convert') => {
+    setActiveTab(tab);
+    if (typeof window !== 'undefined') {
+      const targetUrl = tab === 'convert' ? '/convert' : '/';
+      window.history.pushState(null, '', targetUrl);
+    }
+  }, []);
 
   // Transcriber State
   const [text, setText] = useState('');
@@ -159,19 +198,25 @@ export default function OmniScribeApp() {
             </div>
             <h1 className="text-xl font-semibold tracking-tight">OmniScribe <span className="text-white/40 font-normal">Pro</span></h1>
           </div>
-          <nav className="flex items-center p-1 bg-white/5 rounded-lg border border-white/10">
+          <nav className="flex items-center p-1 bg-white/5 rounded-lg border border-white/10 shadow-inner">
             <button 
-              onClick={() => setActiveTab('transcribe')}
-              className={`px-4 py-1.5 rounded-md text-sm font-medium transition-all ${
-                activeTab === 'transcribe' ? 'bg-white/10 text-white shadow-sm' : 'text-white/60 hover:text-white'
+              type="button"
+              onClick={() => switchTab('transcribe')}
+              className={`px-4 py-1.5 rounded-md text-sm font-medium transition-all cursor-pointer select-none ${
+                activeTab === 'transcribe' 
+                  ? 'bg-indigo-600 text-white shadow-md shadow-indigo-600/30 font-semibold' 
+                  : 'text-white/60 hover:text-white hover:bg-white/10'
               }`}
             >
               Live Transcriber
             </button>
             <button 
-              onClick={() => setActiveTab('convert')}
-              className={`px-4 py-1.5 rounded-md text-sm font-medium transition-all ${
-                activeTab === 'convert' ? 'bg-white/10 text-white shadow-sm' : 'text-white/60 hover:text-white'
+              type="button"
+              onClick={() => switchTab('convert')}
+              className={`px-4 py-1.5 rounded-md text-sm font-medium transition-all cursor-pointer select-none ${
+                activeTab === 'convert' 
+                  ? 'bg-indigo-600 text-white shadow-md shadow-indigo-600/30 font-semibold' 
+                  : 'text-white/60 hover:text-white hover:bg-white/10'
               }`}
             >
               Unicode Converter
