@@ -14,7 +14,7 @@ import {
   baminiToUnicode,
   singlishToUnicode,
   tanglishToUnicode,
-} from 'sinhala-unicode-coverter';
+} from '../utils/sinhalaConverters';
 import Keyboard from '../components/Keyboard';
 
 interface ToastItem {

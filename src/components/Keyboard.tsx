@@ -97,13 +97,6 @@ type LangKey = keyof typeof keyMaps;
 export default function Keyboard({ onKeyPress, onBackspace, onSpace, onEnter }: KeyboardProps) {
   const [activeLang, setActiveLang] = useState<LangKey>('tamil');
 
-  // Prevents mouse clicks from taking focus away from the active textarea
-  const handlePointerDown = (e: React.PointerEvent) => {
-    if (e.pointerType === 'mouse') {
-      e.preventDefault();
-    }
-  };
-
   const currentMap = keyMaps[activeLang];
 
   return (
@@ -118,7 +111,6 @@ export default function Keyboard({ onKeyPress, onBackspace, onSpace, onEnter }: 
             <button
               type="button"
               key={lang}
-              onPointerDown={handlePointerDown}
               onClick={() => setActiveLang(lang)}
               className={`px-4 py-1.5 rounded-lg text-sm transition-all border cursor-pointer select-none ${
                 activeLang === lang
@@ -141,7 +133,6 @@ export default function Keyboard({ onKeyPress, onBackspace, onSpace, onEnter }: 
                 <button
                   type="button"
                   key={j}
-                  onPointerDown={handlePointerDown}
                   onClick={() => onKeyPress(key)}
                   className="h-10 min-w-10 px-2 flex items-center justify-center rounded-lg bg-[#27272a] hover:bg-[#3f3f46] active:bg-indigo-600 active:text-white text-white/90 font-medium text-lg border border-white/5 transition-all shadow-sm cursor-pointer select-none active:scale-95"
                 >
@@ -157,7 +148,6 @@ export default function Keyboard({ onKeyPress, onBackspace, onSpace, onEnter }: 
             <button
               type="button"
               key={i}
-              onPointerDown={handlePointerDown}
               onClick={() => onKeyPress(punct)}
               className="h-10 w-10 flex items-center justify-center rounded-lg bg-[#27272a] hover:bg-[#3f3f46] active:bg-indigo-600 active:text-white text-white/90 font-medium text-lg border border-white/5 transition-all cursor-pointer select-none active:scale-95"
             >
@@ -167,7 +157,6 @@ export default function Keyboard({ onKeyPress, onBackspace, onSpace, onEnter }: 
           
           <button
             type="button"
-            onPointerDown={handlePointerDown}
             onClick={onSpace}
             className="h-10 px-6 flex items-center gap-2 rounded-lg bg-[#18181b] hover:bg-[#27272a] active:bg-[#3f3f46] text-emerald-400 font-medium text-sm border border-emerald-500/20 transition-all cursor-pointer select-none active:scale-95 ml-auto"
           >
@@ -175,7 +164,6 @@ export default function Keyboard({ onKeyPress, onBackspace, onSpace, onEnter }: 
           </button>
           <button
             type="button"
-            onPointerDown={handlePointerDown}
             onClick={onBackspace}
             className="h-10 px-4 flex items-center gap-2 rounded-lg bg-[#18181b] hover:bg-[#27272a] active:bg-[#3f3f46] text-red-400 font-medium text-sm border border-red-500/20 transition-all cursor-pointer select-none active:scale-95"
           >
@@ -183,7 +171,6 @@ export default function Keyboard({ onKeyPress, onBackspace, onSpace, onEnter }: 
           </button>
           <button
             type="button"
-            onPointerDown={handlePointerDown}
             onClick={onEnter}
             className="h-10 px-4 flex items-center gap-2 rounded-lg bg-[#18181b] hover:bg-[#27272a] active:bg-[#3f3f46] text-blue-400 font-medium text-sm border border-blue-500/20 transition-all cursor-pointer select-none active:scale-95"
           >
