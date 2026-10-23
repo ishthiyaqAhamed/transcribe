@@ -140,36 +140,26 @@ export default function OmniScribeApp({ initialTab = 'transcribe' }: { initialTa
   }, []);
 
   const updateText = useCallback((newText: string) => {
-    const currentText = historyRef.current[historyIndexRef.current];
+    setText((prev) => (prev === newText ? prev : newText));
+
+    const currentText = historyRef.current[historyIndexRef.current] ?? '';
     if (newText === currentText) return;
 
-    const isSingleChar = Math.abs(newText.length - currentText.length) === 1;
-    const isSpaceOrNewline = newText.endsWith(' ') || newText.endsWith('\n');
-
     let newHistory = historyRef.current.slice(0, historyIndexRef.current + 1);
-
-    if (isSingleChar && !isSpaceOrNewline && historyIndexRef.current > 0) {
-       const prevText = newHistory[newHistory.length - 2];
-       if (Math.abs(newHistory[newHistory.length - 1].length - prevText.length) === 1) {
-         newHistory[newHistory.length - 1] = newText;
-       } else {
-         newHistory.push(newText);
-         historyIndexRef.current = newHistory.length - 1;
-       }
-    } else {
-       newHistory.push(newText);
-       historyIndexRef.current = newHistory.length - 1;
+    newHistory.push(newText);
+    if (newHistory.length > 100) {
+      newHistory = newHistory.slice(newHistory.length - 100);
     }
-
     historyRef.current = newHistory;
-    setText(newText);
+    historyIndexRef.current = newHistory.length - 1;
     updateUI();
   }, [updateUI]);
 
   const undo = useCallback(() => {
     if (historyIndexRef.current > 0) {
       historyIndexRef.current -= 1;
-      setText(historyRef.current[historyIndexRef.current]);
+      const prev = historyRef.current[historyIndexRef.current] ?? '';
+      setText(prev);
       updateUI();
     }
   }, [updateUI]);
@@ -177,13 +167,14 @@ export default function OmniScribeApp({ initialTab = 'transcribe' }: { initialTa
   const redo = useCallback(() => {
     if (historyIndexRef.current < historyRef.current.length - 1) {
       historyIndexRef.current += 1;
-      setText(historyRef.current[historyIndexRef.current]);
+      const next = historyRef.current[historyIndexRef.current] ?? '';
+      setText(next);
       updateUI();
     }
   }, [updateUI]);
 
   const clearText = useCallback(() => {
-    if (historyRef.current[historyIndexRef.current] !== '') {
+    if ((historyRef.current[historyIndexRef.current] ?? '') !== '') {
       updateText('');
     }
   }, [updateText]);
@@ -369,14 +360,28 @@ function TranscriberView({
     textRef.current = text;
   }, [text]);
 
-  useEffect(() => {
-    if (typeof window !== 'undefined' && ('SpeechRecognition' in window || 'webkitSpeechRecognition' in window)) {
-      const SpeechRecognition = (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition;
-      recognitionRef.current = new SpeechRecognition();
-      recognitionRef.current.continuous = true;
-      recognitionRef.current.interimResults = true;
+  const initRecognition = useCallback(() => {
+    if (typeof window === 'undefined') return null;
+    const SpeechRecognition = (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition;
+    if (!SpeechRecognition) return null;
 
-      recognitionRef.current.onresult = (event: any) => {
+    try {
+      if (recognitionRef.current) {
+        try {
+          recognitionRef.current.abort();
+        } catch (_) {}
+      }
+
+      const rec = new SpeechRecognition();
+      rec.continuous = true;
+      rec.interimResults = true;
+      rec.lang = language;
+
+      rec.onstart = () => {
+        setIsRecording(true);
+      };
+
+      rec.onresult = (event: any) => {
         let final = '';
         let interim = '';
         for (let i = event.resultIndex; i < event.results.length; ++i) {
@@ -386,76 +391,197 @@ function TranscriberView({
             interim += event.results[i][0].transcript;
           }
         }
-        if (final) updateText(textRef.current + final);
+        if (final) {
+          const current = textRef.current ?? '';
+          const space = current && !current.endsWith(' ') && !current.endsWith('\n') ? ' ' : '';
+          const updated = current + space + final;
+          textRef.current = updated;
+          updateText(updated);
+        }
         setInterimText(interim);
       };
-      
-      recognitionRef.current.onerror = (e: any) => {
-        console.error("Speech recognition error", e);
+
+      rec.onerror = (e: any) => {
+        console.error("Speech recognition error:", e.error, e);
         setIsRecording(false);
+        setInterimText('');
+        if (e.error === 'not-allowed') {
+          showToast("Microphone access blocked! Click the lock/microphone icon in your browser address bar to allow access.", "error");
+        } else if (e.error === 'audio-capture') {
+          showToast("No microphone detected. Please check your microphone connection.", "error");
+        } else if (e.error === 'network') {
+          showToast("Network error. Speech recognition requires an active internet connection.", "error");
+        } else if (e.error === 'no-speech') {
+          showToast("No speech detected. Please speak closer to your microphone.", "warning");
+        } else if (e.error !== 'aborted') {
+          showToast(`Speech recognition error: ${e.error}`, "error");
+        }
       };
+
+      rec.onend = () => {
+        setIsRecording(false);
+        setInterimText('');
+      };
+
+      recognitionRef.current = rec;
+      return rec;
+    } catch (err) {
+      console.error("Failed to initialize SpeechRecognition:", err);
+      return null;
     }
-  }, [updateText]);
+  }, [language, updateText, showToast]);
+
+  useEffect(() => {
+    initRecognition();
+    return () => {
+      try {
+        recognitionRef.current?.abort();
+      } catch (_) {}
+    };
+  }, [initRecognition]);
 
   useEffect(() => {
     if (recognitionRef.current) {
       recognitionRef.current.lang = language;
-      if (isRecording) {
-        recognitionRef.current.stop();
-        setTimeout(() => recognitionRef.current.start(), 100);
+    }
+    if (isRecording) {
+      try {
+        recognitionRef.current?.stop();
+      } catch (_) {}
+      setTimeout(() => {
+        try {
+          const rec = initRecognition();
+          rec?.start();
+          setIsRecording(true);
+        } catch (_) {}
+      }, 200);
+    }
+  }, [language, initRecognition, isRecording]);
+
+  const toggleRecording = async () => {
+    if (isRecording) {
+      try {
+        recognitionRef.current?.stop();
+      } catch (e) {
+        console.error("Error stopping recognition:", e);
+      }
+      setIsRecording(false);
+      setInterimText('');
+      showToast("Recording stopped.", "info");
+      return;
+    }
+
+    const SpeechRecognition = typeof window !== 'undefined' && ((window as any).SpeechRecognition || (window as any).webkitSpeechRecognition);
+    if (!SpeechRecognition) {
+      showToast("Speech Recognition is not supported in this browser. Please open OmniScribe in Google Chrome or Microsoft Edge.", "error");
+      return;
+    }
+
+    // Attempt to verify or request microphone permission
+    if (typeof navigator !== 'undefined' && navigator.mediaDevices && navigator.mediaDevices.getUserMedia) {
+      try {
+        const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+        stream.getTracks().forEach((t) => t.stop());
+      } catch (micErr: any) {
+        console.warn("Microphone access error:", micErr);
+        if (micErr.name === 'NotAllowedError' || micErr.name === 'PermissionDeniedError') {
+          showToast("Microphone access blocked! Click the lock/camera icon in your address bar to allow microphone access.", "error");
+          return;
+        }
       }
     }
-  }, [language]);
 
-  const toggleRecording = () => {
-    if (isRecording) {
-      recognitionRef.current?.stop();
-      setIsRecording(false);
-    } else {
-      const current = textRef.current;
-      updateText(current + (current.endsWith(' ') || current.length === 0 ? '' : ' '));
-      recognitionRef.current?.start();
+    const rec = initRecognition();
+    if (!rec) {
+      showToast("Could not start speech recognition.", "error");
+      return;
+    }
+
+    try {
+      rec.lang = language;
+      rec.start();
       setIsRecording(true);
+      const langNames: Record<string, string> = {
+        'en-US': 'English',
+        'ta-LK': 'Tamil (தமிழ்)',
+        'si-LK': 'Sinhala (සිංහල)',
+        'ar-SA': 'Arabic (العربية)',
+        'hi-IN': 'Hindi (हिन्दी)',
+        'ur-PK': 'Urdu (اردو)',
+      };
+      showToast(`Recording active. Listening in ${langNames[language] || language}...`, "success");
+    } catch (startErr: any) {
+      console.error("Speech start error:", startErr);
+      if (startErr.name === 'InvalidStateError') {
+        setIsRecording(true);
+      } else {
+        showToast("Error starting speech recognition: " + (startErr.message || "Please refresh the page"), "error");
+        setIsRecording(false);
+      }
     }
   };
 
   const insertText = (str: string) => {
     const el = textAreaRef.current;
-    if (el) {
-      const start = el.selectionStart;
-      const end = el.selectionEnd;
-      const newText = textRef.current.substring(0, start) + str + textRef.current.substring(end);
-      updateText(newText);
-      setTimeout(() => {
-        el.selectionStart = el.selectionEnd = start + str.length;
-        el.focus();
-      }, 0);
-    } else {
-      updateText(textRef.current + str);
+    const current = textRef.current ?? '';
+
+    let start = current.length;
+    let end = current.length;
+
+    if (el && typeof el.selectionStart === 'number' && typeof el.selectionEnd === 'number') {
+      start = el.selectionStart;
+      end = el.selectionEnd;
     }
+
+    const newText = current.substring(0, start) + str + current.substring(end);
+    textRef.current = newText;
+    updateText(newText);
+
+    const nextPos = start + str.length;
+    requestAnimationFrame(() => {
+      if (el) {
+        el.focus();
+        el.setSelectionRange(nextPos, nextPos);
+      }
+    });
   };
 
   const handleBackspace = () => {
     const el = textAreaRef.current;
-    if (el) {
-      const start = el.selectionStart;
-      const end = el.selectionEnd;
-      if (start === end && start > 0) {
-        const newText = textRef.current.substring(0, start - 1) + textRef.current.substring(end);
-        updateText(newText);
-        setTimeout(() => {
-          el.selectionStart = el.selectionEnd = start - 1;
-          el.focus();
-        }, 0);
-      } else if (start !== end) {
-        const newText = textRef.current.substring(0, start) + textRef.current.substring(end);
-        updateText(newText);
-        setTimeout(() => {
-          el.selectionStart = el.selectionEnd = start;
-          el.focus();
-        }, 0);
-      }
+    const current = textRef.current ?? '';
+    if (!current) return;
+
+    let start = current.length;
+    let end = current.length;
+
+    if (el && typeof el.selectionStart === 'number' && typeof el.selectionEnd === 'number') {
+      start = el.selectionStart;
+      end = el.selectionEnd;
     }
+
+    let newText = current;
+    let nextPos = start;
+
+    if (start !== end) {
+      newText = current.substring(0, start) + current.substring(end);
+      nextPos = start;
+    } else if (start > 0) {
+      const chars = Array.from(current.substring(0, start));
+      chars.pop();
+      const prefix = chars.join('');
+      newText = prefix + current.substring(end);
+      nextPos = prefix.length;
+    }
+
+    textRef.current = newText;
+    updateText(newText);
+
+    requestAnimationFrame(() => {
+      if (el) {
+        el.focus();
+        el.setSelectionRange(nextPos, nextPos);
+      }
+    });
   };
 
   const handleExportWord = async () => {
@@ -668,7 +794,10 @@ function TranscriberView({
               ref={textAreaRef}
               value={text}
               dir={language.startsWith('ar') || language.startsWith('ur') ? 'rtl' : 'ltr'}
-              onChange={(e) => updateText(e.target.value)}
+              onChange={(e) => {
+                textRef.current = e.target.value;
+                updateText(e.target.value);
+              }}
               placeholder="Your transcript will appear here. You can also type directly..."
               className={`w-full min-h-[300px] bg-transparent text-white/90 text-lg resize-y outline-none placeholder:text-white/20 font-light leading-relaxed ${
                 language.startsWith('ar') || language.startsWith('ur') ? 'text-right' : 'text-left'

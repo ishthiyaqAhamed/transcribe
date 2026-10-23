@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useRef } from 'react';
 import { Delete, Space, CornerDownLeft, Keyboard as KeyboardIcon } from 'lucide-react';
 
 interface KeyboardProps {
@@ -96,6 +96,22 @@ type LangKey = keyof typeof keyMaps;
 
 export default function Keyboard({ onKeyPress, onBackspace, onSpace, onEnter }: KeyboardProps) {
   const [activeLang, setActiveLang] = useState<LangKey>('tamil');
+  const lastTouchTimeRef = useRef(0);
+
+  const handleTouch = (e: React.TouchEvent, action: () => void) => {
+    e.preventDefault();
+    lastTouchTimeRef.current = Date.now();
+    action();
+  };
+
+  const handleClick = (e: React.MouseEvent, action: () => void) => {
+    e.preventDefault();
+    // Guard against synthetic click fired 300ms after touchstart on hybrid/mobile devices
+    if (Date.now() - lastTouchTimeRef.current < 500) {
+      return;
+    }
+    action();
+  };
 
   const currentMap = keyMaps[activeLang];
 
@@ -109,12 +125,14 @@ export default function Keyboard({ onKeyPress, onBackspace, onSpace, onEnter }: 
         <div className="flex flex-wrap gap-2">
           {(Object.keys(keyMaps) as LangKey[]).map((lang) => (
             <button
+              type="button"
               key={lang}
+              onMouseDown={(e) => e.preventDefault()}
               onClick={() => setActiveLang(lang)}
-              className={`px-4 py-1.5 rounded-lg text-sm transition-all border ${
+              className={`px-4 py-1.5 rounded-lg text-sm transition-all border cursor-pointer select-none ${
                 activeLang === lang
-                  ? 'bg-emerald-500/10 border-emerald-500/50 text-emerald-400 font-medium'
-                  : 'bg-white/5 border-transparent text-white/60 hover:bg-white/10'
+                  ? 'bg-emerald-500/10 border-emerald-500/50 text-emerald-400 font-medium shadow-sm'
+                  : 'bg-white/5 border-transparent text-white/60 hover:bg-white/10 hover:text-white'
               }`}
             >
               {keyMaps[lang].name} Keyboard
@@ -130,9 +148,12 @@ export default function Keyboard({ onKeyPress, onBackspace, onSpace, onEnter }: 
             <div className="flex flex-wrap gap-2">
               {group.keys.map((key, j) => (
                 <button
+                  type="button"
                   key={j}
-                  onClick={() => onKeyPress(key)}
-                  className="h-10 w-10 flex items-center justify-center rounded-lg bg-[#27272a] hover:bg-[#3f3f46] active:bg-indigo-600 active:text-white text-white/90 font-medium text-lg border border-white/5 transition-colors shadow-sm"
+                  onMouseDown={(e) => e.preventDefault()}
+                  onTouchStart={(e) => handleTouch(e, () => onKeyPress(key))}
+                  onClick={(e) => handleClick(e, () => onKeyPress(key))}
+                  className="h-10 min-w-10 px-2 flex items-center justify-center rounded-lg bg-[#27272a] hover:bg-[#3f3f46] active:bg-indigo-600 active:text-white text-white/90 font-medium text-lg border border-white/5 transition-all shadow-sm cursor-pointer select-none active:scale-95"
                 >
                   {key}
                 </button>
@@ -141,32 +162,44 @@ export default function Keyboard({ onKeyPress, onBackspace, onSpace, onEnter }: 
           </div>
         ))}
 
-        <div className="pt-4 border-t border-white/10 flex flex-wrap gap-2">
+        <div className="pt-4 border-t border-white/10 flex flex-wrap gap-2 items-center">
           {['.', ',', '?', '!', '-'].map((punct, i) => (
             <button
+              type="button"
               key={i}
-              onClick={() => onKeyPress(punct)}
-              className="h-10 w-10 flex items-center justify-center rounded-lg bg-[#27272a] hover:bg-[#3f3f46] text-white/90 font-medium text-lg border border-white/5 transition-colors"
+              onMouseDown={(e) => e.preventDefault()}
+              onTouchStart={(e) => handleTouch(e, () => onKeyPress(punct))}
+              onClick={(e) => handleClick(e, () => onKeyPress(punct))}
+              className="h-10 w-10 flex items-center justify-center rounded-lg bg-[#27272a] hover:bg-[#3f3f46] active:bg-indigo-600 active:text-white text-white/90 font-medium text-lg border border-white/5 transition-all cursor-pointer select-none active:scale-95"
             >
               {punct}
             </button>
           ))}
           
           <button
-            onClick={onSpace}
-            className="h-10 px-6 flex items-center gap-2 rounded-lg bg-[#18181b] hover:bg-[#27272a] text-emerald-400 font-medium text-sm border border-emerald-500/20 transition-colors ml-auto"
+            type="button"
+            onMouseDown={(e) => e.preventDefault()}
+            onTouchStart={(e) => handleTouch(e, onSpace)}
+            onClick={(e) => handleClick(e, onSpace)}
+            className="h-10 px-6 flex items-center gap-2 rounded-lg bg-[#18181b] hover:bg-[#27272a] active:bg-[#3f3f46] text-emerald-400 font-medium text-sm border border-emerald-500/20 transition-all cursor-pointer select-none active:scale-95 ml-auto"
           >
-            Space
+            <Space className="w-4 h-4" /> Space
           </button>
           <button
-            onClick={onBackspace}
-            className="h-10 px-4 flex items-center gap-2 rounded-lg bg-[#18181b] hover:bg-[#27272a] text-red-400 font-medium text-sm border border-red-500/20 transition-colors"
+            type="button"
+            onMouseDown={(e) => e.preventDefault()}
+            onTouchStart={(e) => handleTouch(e, onBackspace)}
+            onClick={(e) => handleClick(e, onBackspace)}
+            className="h-10 px-4 flex items-center gap-2 rounded-lg bg-[#18181b] hover:bg-[#27272a] active:bg-[#3f3f46] text-red-400 font-medium text-sm border border-red-500/20 transition-all cursor-pointer select-none active:scale-95"
           >
             <Delete className="w-4 h-4" /> Backspace
           </button>
           <button
-            onClick={onEnter}
-            className="h-10 px-4 flex items-center gap-2 rounded-lg bg-[#18181b] hover:bg-[#27272a] text-blue-400 font-medium text-sm border border-blue-500/20 transition-colors"
+            type="button"
+            onMouseDown={(e) => e.preventDefault()}
+            onTouchStart={(e) => handleTouch(e, onEnter)}
+            onClick={(e) => handleClick(e, onEnter)}
+            className="h-10 px-4 flex items-center gap-2 rounded-lg bg-[#18181b] hover:bg-[#27272a] active:bg-[#3f3f46] text-blue-400 font-medium text-sm border border-blue-500/20 transition-all cursor-pointer select-none active:scale-95"
           >
             <CornerDownLeft className="w-4 h-4" /> Enter
           </button>
@@ -175,3 +208,4 @@ export default function Keyboard({ onKeyPress, onBackspace, onSpace, onEnter }: 
     </div>
   );
 }
+
