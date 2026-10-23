@@ -850,6 +850,7 @@ function ConverterView({
       switch (targetFont) {
         // --- Tamil ---
         case 'bamini':
+        case 'baamini':
           result = (tamilTools.regExpHelper as any).UnicodeToBamini 
             ? (tamilTools.regExpHelper as any).UnicodeToBamini(sourceText) 
             : sourceText;
@@ -860,6 +861,7 @@ function ConverterView({
             : sourceText;
           break;
         case 'bamini-to-unicode':
+        case 'baamini-to-unicode':
           result = baminiToUnicode(sourceText);
           break;
         case 'tanglish-to-unicode':
@@ -956,11 +958,13 @@ function ConverterView({
     switch (targetFont) {
       // Tamil
       case 'bamini':
-        return "'Bamini', sans-serif";
+      case 'baamini':
+        return "'Baamini', 'Bamini', sans-serif";
       case 'tscii':
         return "'TSCII', sans-serif";
       case 'google-tamil':
       case 'bamini-to-unicode':
+      case 'baamini-to-unicode':
       case 'tanglish-to-unicode':
         return "'Noto Sans Tamil', sans-serif";
       case 'tiro-tamil':
@@ -1022,7 +1026,7 @@ function ConverterView({
   };
 
   const getExportFontFace = () => {
-    if (targetFont === 'bamini') return 'Bamini';
+    if (targetFont === 'bamini' || targetFont === 'baamini') return 'Bamini';
     if (targetFont === 'tscii') return 'TSCII';
     if (targetFont === 'dl-manel' || targetFont === 'kaputa') return 'DL-Manel';
     if (targetFont.startsWith('arabic-')) return 'Amiri';
@@ -1253,10 +1257,12 @@ function ConverterView({
               
               <optgroup label="Tamil (தமிழ்)" className="bg-[#18181b] text-indigo-300 font-semibold">
                 <option value="bamini" className="text-white">Tamil: Bamini (Legacy Encoding)</option>
+                <option value="baamini" className="text-white">Tamil: Baamini (Legacy Encoding)</option>
                 <option value="tscii" className="text-white">Tamil: TSCII (Legacy Encoding)</option>
                 <option value="google-tamil" className="text-white">Tamil: Noto Sans Tamil (Modern Clean)</option>
                 <option value="tiro-tamil" className="text-white">Tamil: Tiro Tamil (Literary Serif)</option>
                 <option value="bamini-to-unicode" className="text-white">Tamil: Bamini ➔ Unicode Converter</option>
+                <option value="baamini-to-unicode" className="text-white">Tamil: Baamini ➔ Unicode Converter</option>
                 <option value="tanglish-to-unicode" className="text-white">Tamil: Tanglish (Phonetic) ➔ Unicode</option>
               </optgroup>
 
