@@ -373,8 +373,12 @@ function TranscriberView({
       }
 
       const rec = new SpeechRecognition();
-      rec.continuous = true;
-      rec.interimResults = true;
+      try {
+        rec.continuous = true;
+      } catch (_) {}
+      try {
+        rec.interimResults = true;
+      } catch (_) {}
       rec.lang = language;
 
       rec.onstart = () => {
@@ -432,13 +436,12 @@ function TranscriberView({
   }, [language, updateText, showToast]);
 
   useEffect(() => {
-    initRecognition();
     return () => {
       try {
         recognitionRef.current?.abort();
       } catch (_) {}
     };
-  }, [initRecognition]);
+  }, []);
 
   useEffect(() => {
     if (recognitionRef.current) {
@@ -458,7 +461,7 @@ function TranscriberView({
     }
   }, [language, initRecognition, isRecording]);
 
-  const toggleRecording = async () => {
+  const toggleRecording = () => {
     if (isRecording) {
       try {
         recognitionRef.current?.stop();
@@ -475,20 +478,6 @@ function TranscriberView({
     if (!SpeechRecognition) {
       showToast("Speech Recognition is not supported in this browser. Please open OmniScribe in Google Chrome or Microsoft Edge.", "error");
       return;
-    }
-
-    // Attempt to verify or request microphone permission
-    if (typeof navigator !== 'undefined' && navigator.mediaDevices && navigator.mediaDevices.getUserMedia) {
-      try {
-        const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
-        stream.getTracks().forEach((t) => t.stop());
-      } catch (micErr: any) {
-        console.warn("Microphone access error:", micErr);
-        if (micErr.name === 'NotAllowedError' || micErr.name === 'PermissionDeniedError') {
-          showToast("Microphone access blocked! Click the lock/camera icon in your address bar to allow microphone access.", "error");
-          return;
-        }
-      }
     }
 
     const rec = initRecognition();
