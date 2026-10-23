@@ -5,9 +5,6 @@ import {
   Mic, MicOff, Download, Copy, Trash2, ArrowRightLeft, FileText, Type, Undo, Redo,
   CheckCircle2, AlertTriangle, AlertCircle, Info, X
 } from 'lucide-react';
-import { Document, Packer, Paragraph, TextRun } from 'docx';
-import PptxGenJS from 'pptxgenjs';
-import { jsPDF } from 'jspdf';
 import * as tamilTools from 'tamil-language-tools-and-assets';
 import {
   unicodeToDlManel,
@@ -584,6 +581,8 @@ function TranscriberView({
       return;
     }
     try {
+      showToast("Preparing Word document...", "info");
+      const { Document, Packer, Paragraph, TextRun } = await import('docx');
       const doc = new Document({
         sections: [{
           children: [
@@ -606,12 +605,14 @@ function TranscriberView({
     }
   };
 
-  const handleExportPDF = () => {
+  const handleExportPDF = async () => {
     if (!text.trim()) {
       showToast("Nothing to export! Transcript is empty.", "warning");
       return;
     }
     try {
+      showToast("Preparing PDF document...", "info");
+      const { jsPDF } = await import('jspdf');
       const pdf = new jsPDF();
       const splitText = pdf.splitTextToSize(text, 180);
       pdf.text(splitText, 15, 20);
@@ -623,13 +624,16 @@ function TranscriberView({
     }
   };
 
-  const handleExportPPT = () => {
+  const handleExportPPT = async () => {
     if (!text.trim()) {
       showToast("Nothing to export! Transcript is empty.", "warning");
       return;
     }
     try {
-      const pres = new PptxGenJS();
+      showToast("Preparing PowerPoint document...", "info");
+      const PptxGenJSModule = await import('pptxgenjs');
+      const PptxGenJS = PptxGenJSModule.default || PptxGenJSModule;
+      const pres = new (PptxGenJS as any)();
       const slide = pres.addSlide();
       slide.addText(text, { x: 0.5, y: 0.5, w: '90%', h: '80%', fontSize: 24, fontFace: 'Nirmala UI' });
       pres.writeFile({ fileName: 'OmniScribe_Transcript.pptx' });
@@ -1040,6 +1044,8 @@ function ConverterView({
       return;
     }
     try {
+      showToast("Preparing Word document...", "info");
+      const { Document, Packer, Paragraph, TextRun } = await import('docx');
       const doc = new Document({
         sections: [{
           children: [
@@ -1062,12 +1068,14 @@ function ConverterView({
     }
   };
 
-  const handleExportPDF = () => {
+  const handleExportPDF = async () => {
     if (!convertedText.trim()) {
       showToast("Nothing to export! Converted output is empty.", "warning");
       return;
     }
     try {
+      showToast("Preparing PDF document...", "info");
+      const { jsPDF } = await import('jspdf');
       const pdf = new jsPDF();
       const splitText = pdf.splitTextToSize(convertedText, 180);
       pdf.text(splitText, 15, 20);
@@ -1079,13 +1087,16 @@ function ConverterView({
     }
   };
 
-  const handleExportPPT = () => {
+  const handleExportPPT = async () => {
     if (!convertedText.trim()) {
       showToast("Nothing to export! Converted output is empty.", "warning");
       return;
     }
     try {
-      const pres = new PptxGenJS();
+      showToast("Preparing PowerPoint document...", "info");
+      const PptxGenJSModule = await import('pptxgenjs');
+      const PptxGenJS = PptxGenJSModule.default || PptxGenJSModule;
+      const pres = new (PptxGenJS as any)();
       const slide = pres.addSlide();
       slide.addText(convertedText, { 
         x: 0.5, 
